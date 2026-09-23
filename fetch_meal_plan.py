@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-Fetch this week's meal plan from Paprika's (unofficial) Cloud Sync API and
-write it out as (1) a plain JSON array and (2) a fully self-contained,
+Fetch this week's meal plan from Paprika's (unofficial) Cloud Sync API,
+plus the kids' school lunch menu from Nutrislice, and write it out as
+(1) a plain JSON array (Paprika data only) and (2) a fully self-contained,
 pre-rendered HTML page, meant to be served via GitHub Pages and shown on
 Dakboard through a Website/iframe block (rather than Dakboard's built-in
 External Data/JSON block, which has limited styling and has been observed
@@ -17,6 +18,11 @@ intended setup) and are never written to disk or logged.
 This uses Paprika's undocumented sync API, reverse-engineered by the
 community (see https://github.com/aarons22/paprika-tools). It could break
 if Paprika changes their backend.
+
+It also calls Nutrislice's public (also unofficial) menu API to pull the
+school lunch menu -- no credentials needed there, just a browser-like
+User-Agent header, or requests get rejected. See NUTRISLICE_* below to
+point this at a different district/school.
 """
 
 import base64
@@ -46,11 +52,24 @@ WEEK_LENGTH_DAYS = 7
 MEAL_TYPE_NAMES = {0: "Breakfast", 1: "Lunch", 2: "Dinner", 3: "Snack"}
 MEAL_TYPE_ORDER = {0: 0, 1: 1, 2: 2, 3: 3}
 
-# The dashboard page only shows these two columns (Dinner left, Lunch
-# right) - breakfast/snack entries, if you ever add any, are included in
+# The dashboard page only shows these two Paprika slots (Dinner, Lunch) -
+# breakfast/snack entries, if you ever add any, are included in
 # meal-plan.json but won't appear on the rendered page.
 DINNER_TYPE = 2
 LUNCH_TYPE = 1
+
+# Nutrislice school lunch menu. Change these to match your own district's
+# Nutrislice site: if the menu lives at
+#   https://<district>.nutrislice.com/menu/<school>/<menu-type>
+# then NUTRISLICE_DISTRICT = "<district>", NUTRISLICE_SCHOOL = "<school>",
+# NUTRISLICE_MENU_TYPE = "<menu-type>".
+NUTRISLICE_DISTRICT = "lakewashingtonsd"
+NUTRISLICE_SCHOOL = "einstein-elementary"
+NUTRISLICE_MENU_TYPE = "lunch"
+NUTRISLICE_USER_AGENT = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+)
 
 
 def _parse_json_response(resp: requests.Response) -> dict:
@@ -115,7 +134,7 @@ def build_dakboard_json(meals: list, today: datetime.date = None) -> list:
     """Filter meals to the current Fri-Thu planning cycle and shape them
     into a plain {value, title, subtitle} list -- kept around as a
     general-purpose export (all meal types included), separate from the
-    dinner/lunch-only columns the rendered page shows."""
+    dinner/lunch/school-lunch columns the rendered page shows."""
     if today is None:
         today = datetime.now().date()
     window_start, window_end = current_cycle_bounds(today)
@@ -152,14 +171,93 @@ def build_dakboard_json(meals: list, today: datetime.date = None) -> list:
     return entries
 
 
-def build_days(meals: list, today: datetime.date = None) -> list:
+def _nutrislice_week_start(d):
+    """Nutrislice's week endpoint returns a Sunday-Saturday calendar week;
+    find the Sunday that starts the week containing `d`."""
+    days_since_sunday = (d.weekday() + 1) % 7  # Mon=0..Sun=6 -> Sun=0
+    return d - timedelta(days=days_since_sunday)
+
+
+def fetch_nutrislice_week(any_date_in_week) -> dict:
+    url = (
+        f"https://{NUTRISLICE_DISTRICT}.api.nutrislice.com/menu/api/weeks/school/"
+        f"{NUTRISLICE_SCHOOL}/menu-type/{NUTRISLICE_MENU_TYPE}/"
+        f"{any_date_in_week.year}/{any_date_in_week.month}/{any_date_in_week.day}/"
+    )
+    resp = requests.get(url, headers={"User-Agent": NUTRISLICE_USER_AGENT}, timeout=30)
+    resp.raise_for_status()
+    return resp.json()
+
+
+def _extract_entrees(day_payload: dict) -> list:
+    """Pull just the bold "main course" items out of one day's Nutrislice
+    menu -- everything else (sides, condiments, snacks) is ignored.
+    Nutrislice marks the main courses with food_category == "entree"."""
+    names = []
+    for item in day_payload.get("menu_items", []):
+        if item.get("is_section_title") or item.get("is_station_header") or item.get("is_holiday"):
+            continue
+        food = item.get("food") or {}
+        category = food.get("food_category") or item.get("food_category")
+        if category != "entree":
+            continue
+        name = food.get("name") or item.get("text")
+        if name:
+            names.append(name)
+    return names
+
+
+def get_school_lunch_days(window_start, window_end) -> dict:
+    """Fetch school lunch entrees for every day in [window_start,
+    window_end]. Nutrislice's API returns a full Sunday-Saturday week per
+    call, and the Fri-Thu planning cycle almost always spans two such
+    weeks, so this fetches each distinct week once and merges the results.
+    Returns {date: [entree names]}; days with no published menu (weekends,
+    holidays, no data yet) simply won't have a key, which the caller
+    treats the same as an empty list. Network or schema problems are
+    swallowed (with a warning to stderr) so a Nutrislice hiccup never
+    takes down the Paprika half of the page."""
+    entrees_by_date = {}
+
+    week_starts_needed = set()
+    d = window_start
+    while d <= window_end:
+        week_starts_needed.add(_nutrislice_week_start(d))
+        d += timedelta(days=1)
+
+    for week_start in sorted(week_starts_needed):
+        try:
+            payload = fetch_nutrislice_week(week_start)
+            for day in payload.get("days", []):
+                date_str = day.get("date")
+                if not date_str:
+                    continue
+                try:
+                    day_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+                except ValueError:
+                    continue
+                if window_start <= day_date <= window_end:
+                    entrees_by_date[day_date] = _extract_entrees(day)
+        except Exception as exc:  # best-effort: never fail the whole run over this
+            print(
+                f"Warning: couldn't fetch school lunch menu for week of "
+                f"{week_start}: {exc}",
+                file=sys.stderr,
+            )
+
+    return entrees_by_date
+
+
+def build_days(meals: list, today: datetime.date = None, school_lunch: dict = None) -> list:
     """Shape meals into one entry per day of the current Fri-Thu cycle,
-    each with a `dinner` and `lunch` slot (None if nothing's planned) --
-    this is what the two-column page is built from. Every day in the
-    cycle is included, even ones with no meals, so the table always shows
-    a full week."""
+    each with `dinner`, `lunch`, and `school_lunch` slots -- this is what
+    the three-column page is built from. Every day in the cycle is
+    included, even ones with no meals, so the table always shows a full
+    week."""
     if today is None:
         today = datetime.now().date()
+    if school_lunch is None:
+        school_lunch = {}
     window_start, window_end = current_cycle_bounds(today)
 
     by_slot = {}
@@ -191,6 +289,7 @@ def build_days(meals: list, today: datetime.date = None) -> list:
                 "label": d.strftime("%a %-m/%-d"),
                 "dinner": slot_text(d, DINNER_TYPE),
                 "lunch": slot_text(d, LUNCH_TYPE),
+                "school_lunch": school_lunch.get(d, []),
                 "is_today": d == today,
                 "is_past": d < today,
             }
@@ -208,7 +307,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   * {{ box-sizing: border-box; }}
   html, body {{
     margin: 0; padding: 0;
-    background-color: transparent;
+    background-color: rgba(144, 238, 144, 0.05);
     color: #f2f2f0;
     font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   }}
@@ -230,36 +329,49 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   table {{
     width: 100%;
     border-collapse: collapse;
+    table-layout: fixed;
   }}
+  colgroup .day-col {{ width: 68px; }}
+  colgroup .lunch-col {{ width: 47px; }}
+  colgroup .dinner-col {{ width: 151px; }}
+  colgroup .school-col {{ width: 202px; }}
   th {{
     text-align: left;
-    font-size: 11px;
+    font-size: 10px;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: #6d7178;
+    letter-spacing: 0.03em;
+    color: #f2f2f0;
     font-weight: 500;
-    padding: 0 0 6px;
+    padding: 0 8px 6px 0;
     border-bottom: 1px solid #2a2d31;
   }}
-  th.day-col {{ width: 78px; }}
-  th.meal-col {{ width: 46%; }}
   td {{
-    padding: 6px 0;
+    padding: 6px 8px 6px 0;
     border-bottom: 1px solid #222427;
     vertical-align: top;
-    font-size: 13px;
+    font-size: 12px;
   }}
   tr:last-child td {{ border-bottom: none; }}
   td.day {{
     color: #8a8f98;
-    font-size: 12px;
-    padding-right: 8px;
+    font-size: 11px;
     white-space: nowrap;
   }}
   td.meal {{
-    padding-right: 10px;
     font-weight: 500;
-    line-height: 1.3;
+    line-height: 1.35;
+    word-break: break-word;
+  }}
+  td.lunch {{
+    text-align: center;
+  }}
+  td.dinner {{
+    font-size: 16px;
+  }}
+  td.school .sline {{
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }}
   td.meal.empty {{
     color: #4a4d52;
@@ -273,7 +385,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     color: #35373a;
   }}
   tr.today td {{
-    background: #1f232a;
+    background: rgba(144, 238, 144, 0.5);
     font-weight: 700;
   }}
   tr.today td.day {{
@@ -296,10 +408,17 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <div class="card">
   <div class="header">This week's meals</div>
   <table>
+    <colgroup>
+      <col class="day-col">
+      <col class="dinner-col">
+      <col class="lunch-col">
+      <col class="school-col">
+    </colgroup>
     <tr>
-      <th class="day-col"></th>
-      <th class="meal-col">Dinner</th>
-      <th class="meal-col">Lunch</th>
+      <th></th>
+      <th>Dinner</th>
+      <th style="text-align: center;">Lunch</th>
+      <th>School lunch</th>
     </tr>
 {rows}
   </table>
@@ -313,22 +432,32 @@ ROW_TEMPLATE = """    <tr{row_class}>
       <td class="day">{day}</td>
       {dinner_cell}
       {lunch_cell}
+      {school_cell}
     </tr>"""
 
 
-def _meal_cell(value):
+def _meal_cell(value, extra_class):
+    cls = f"meal {extra_class}"
     if value:
-        return f'<td class="meal">{escape(value)}</td>'
-    return '<td class="meal empty">–</td>'
+        return f'<td class="{cls}">{escape(value)}</td>'
+    return f'<td class="{cls} empty">–</td>'
+
+
+def _school_cell(names):
+    if names:
+        lines = "".join(f'<div class="sline">{escape(n)}</div>' for n in names)
+        return f'<td class="meal school">{lines}</td>'
+    return '<td class="meal school empty">–</td>'
 
 
 def build_html(days: list, generated_at: datetime = None) -> str:
     """Render the day list as a fully self-contained, pre-rendered HTML
     page -- no client-side fetch/JS needed, since Dakboard's Website/iframe
-    block just reloads this URL on whatever interval you set. Transparent
-    background by design, so Dakboard's own wallpaper shows through (also
-    check the block's own Formatting tab in Dakboard is set to no
-    background, since that's a separate layer from this page's CSS)."""
+    block just reloads this URL on whatever interval you set. Background
+    is a faint green tint (95% transparent) rather than fully clear, so
+    Dakboard's own wallpaper still shows through (also check the block's
+    own Formatting tab in Dakboard is set to no background, since that's a
+    separate layer from this page's CSS)."""
     if generated_at is None:
         generated_at = datetime.now()
 
@@ -346,8 +475,9 @@ def build_html(days: list, generated_at: datetime = None) -> str:
                 else ""
             ),
             day=escape(day["label"]),
-            dinner_cell=_meal_cell(day["dinner"]),
-            lunch_cell=_meal_cell(day["lunch"]),
+            dinner_cell=_meal_cell(day["dinner"], "dinner"),
+            lunch_cell=_meal_cell(day["lunch"], "lunch"),
+            school_cell=_school_cell(day["school_lunch"]),
         )
         for day in days
     )
@@ -367,8 +497,13 @@ def main() -> None:
 
     token = login(email, password)
     meals = get_meals(token)
-    dakboard_data = build_dakboard_json(meals)
-    days = build_days(meals)
+
+    today = datetime.now().date()
+    window_start, window_end = current_cycle_bounds(today)
+
+    dakboard_data = build_dakboard_json(meals, today=today)
+    school_lunch = get_school_lunch_days(window_start, window_end)
+    days = build_days(meals, today=today, school_lunch=school_lunch)
 
     with open(JSON_OUTPUT_FILE, "w", encoding="utf-8") as f:
         json.dump(dakboard_data, f, indent=2)
