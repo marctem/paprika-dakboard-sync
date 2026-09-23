@@ -8,19 +8,23 @@ on:
   workflow_dispatch: {}   # lets you trigger it manually from the Actions tab
 
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
 
-# Queue runs instead of letting two overlap - if a scheduled run fires while
-# a manual run (or another scheduled run) is still committing/pushing, the
-# second one waits rather than racing the first for the same push, which is
-# what causes "failed to push some refs (non-fast-forward)" errors.
+# Only one deployment at a time; a new one queues behind an in-progress
+# one rather than racing it (this is the standard concurrency setup GitHub
+# recommends for Pages deployments).
 concurrency:
-  group: sync-paprika-meal-plan
+  group: pages
   cancel-in-progress: false
 
 jobs:
-  sync:
+  build-and-deploy:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v7
 
@@ -31,14 +35,21 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Fetch meal plan from Paprika
+      - name: Build the meal plan page into _site/
         env:
           PAPRIKA_EMAIL: ${{ secrets.PAPRIKA_EMAIL }}
           PAPRIKA_PASSWORD: ${{ secrets.PAPRIKA_PASSWORD }}
-        run: python fetch_meal_plan.py
+          OUTPUT_DIR: _site
+        run: |
+          mkdir -p _site
+          cp style.css _site/style.css
+          python fetch_meal_plan.py
 
-      - name: Commit updated meal plan files (only if they changed)
-        uses: stefanzweifel/git-auto-commit-action@v7
+      - name: Upload build output as a Pages artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          commit_message: "Update meal plan"
-          file_pattern: meal-plan.json index.html
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

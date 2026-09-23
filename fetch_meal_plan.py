@@ -39,6 +39,12 @@ PAPRIKA_BASE = "https://www.paprikaapp.com/api"
 JSON_OUTPUT_FILE = "meal-plan.json"
 HTML_OUTPUT_FILE = "index.html"
 
+# Where the generated files get written. Defaults to the current directory
+# (handy for a local test run), but the GitHub Actions workflow points this
+# at a scratch build folder (`_site`) that's never committed to the repo --
+# it's uploaded straight to GitHub Pages as a build artifact instead.
+OUTPUT_DIR = os.environ.get("OUTPUT_DIR", ".")
+
 # Your planning cadence: you build the plan Thursday night, covering Friday
 # through the following Thursday. Rather than a rolling "today + 6 days"
 # window (which would cut a cycle in half depending on what day the script
@@ -406,16 +412,20 @@ def main() -> None:
     school_lunch = get_school_lunch_days(window_start, window_end)
     days = build_days(meals, today=today, school_lunch=school_lunch)
 
-    with open(JSON_OUTPUT_FILE, "w", encoding="utf-8") as f:
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    json_path = os.path.join(OUTPUT_DIR, JSON_OUTPUT_FILE)
+    html_path = os.path.join(OUTPUT_DIR, HTML_OUTPUT_FILE)
+
+    with open(json_path, "w", encoding="utf-8") as f:
         json.dump(dakboard_data, f, indent=2)
         f.write("\n")
 
-    with open(HTML_OUTPUT_FILE, "w", encoding="utf-8") as f:
+    with open(html_path, "w", encoding="utf-8") as f:
         f.write(build_html(days))
 
     print(
-        f"Wrote {len(dakboard_data)} meal entries to {JSON_OUTPUT_FILE} and "
-        f"{len(days)} days to {HTML_OUTPUT_FILE}"
+        f"Wrote {len(dakboard_data)} meal entries to {json_path} and "
+        f"{len(days)} days to {html_path}"
     )
 
 

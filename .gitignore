@@ -96,3 +96,12 @@ Thumbs.db
 # Local test/dev output (this project)
 # ==========================================
 /test-output/
+
+# ==========================================
+# Generated meal-plan page (this project)
+# ==========================================
+# Built fresh by fetch_meal_plan.py on every run and deployed straight to
+# GitHub Pages as a build artifact -- never meant to be committed.
+/index.html
+/meal-plan.json
+/_site/
