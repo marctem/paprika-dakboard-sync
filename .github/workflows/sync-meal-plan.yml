@@ -14,9 +14,9 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
 
@@ -30,7 +30,7 @@ jobs:
         run: python fetch_meal_plan.py
 
       - name: Commit updated meal plan files (only if they changed)
-        uses: stefanzweifel/git-auto-commit-action@v5
+        uses: stefanzweifel/git-auto-commit-action@v7
         with:
           commit_message: "Update meal plan"
           file_pattern: meal-plan.json index.html
