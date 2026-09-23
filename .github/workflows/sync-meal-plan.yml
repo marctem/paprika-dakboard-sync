@@ -10,6 +10,14 @@ on:
 permissions:
   contents: write
 
+# Queue runs instead of letting two overlap - if a scheduled run fires while
+# a manual run (or another scheduled run) is still committing/pushing, the
+# second one waits rather than racing the first for the same push, which is
+# what causes "failed to push some refs (non-fast-forward)" errors.
+concurrency:
+  group: sync-paprika-meal-plan
+  cancel-in-progress: false
+
 jobs:
   sync:
     runs-on: ubuntu-latest
