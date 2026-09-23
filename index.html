@@ -8,7 +8,7 @@
   * { box-sizing: border-box; }
   html, body {
     margin: 0; padding: 0;
-    background-color: transparent;
+    background-color: rgba(144, 238, 144, 0.05);
     color: #f2f2f0;
     font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   }
@@ -30,36 +30,49 @@
   table {
     width: 100%;
     border-collapse: collapse;
+    table-layout: fixed;
   }
+  colgroup .day-col { width: 68px; }
+  colgroup .lunch-col { width: 47px; }
+  colgroup .dinner-col { width: 151px; }
+  colgroup .school-col { width: 202px; }
   th {
     text-align: left;
-    font-size: 11px;
+    font-size: 10px;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: #6d7178;
+    letter-spacing: 0.03em;
+    color: #f2f2f0;
     font-weight: 500;
-    padding: 0 0 6px;
+    padding: 0 8px 6px 0;
     border-bottom: 1px solid #2a2d31;
   }
-  th.day-col { width: 78px; }
-  th.meal-col { width: 46%; }
   td {
-    padding: 6px 0;
+    padding: 6px 8px 6px 0;
     border-bottom: 1px solid #222427;
     vertical-align: top;
-    font-size: 13px;
+    font-size: 12px;
   }
   tr:last-child td { border-bottom: none; }
   td.day {
     color: #8a8f98;
-    font-size: 12px;
-    padding-right: 8px;
+    font-size: 11px;
     white-space: nowrap;
   }
   td.meal {
-    padding-right: 10px;
     font-weight: 500;
-    line-height: 1.3;
+    line-height: 1.35;
+    word-break: break-word;
+  }
+  td.lunch {
+    text-align: center;
+  }
+  td.dinner {
+    font-size: 16px;
+  }
+  td.school .sline {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   td.meal.empty {
     color: #4a4d52;
@@ -73,7 +86,7 @@
     color: #35373a;
   }
   tr.today td {
-    background: #1f232a;
+    background: rgba(144, 238, 144, 0.5);
     font-weight: 700;
   }
   tr.today td.day {
@@ -96,48 +109,62 @@
 <div class="card">
   <div class="header">This week's meals</div>
   <table>
+    <colgroup>
+      <col class="day-col">
+      <col class="dinner-col">
+      <col class="lunch-col">
+      <col class="school-col">
+    </colgroup>
     <tr>
-      <th class="day-col"></th>
-      <th class="meal-col">Dinner</th>
-      <th class="meal-col">Lunch</th>
+      <th></th>
+      <th>Dinner</th>
+      <th style="text-align: center;">Lunch</th>
+      <th>School lunch</th>
     </tr>
     <tr class="past">
       <td class="day">Fri 9/18</td>
-      <td class="meal">Sandwiches</td>
-      <td class="meal">(E,G)</td>
+      <td class="meal dinner">Sandwiches</td>
+      <td class="meal lunch">(E,G)</td>
+      <td class="meal school"><div class="sline">Hot Dog</div><div class="sline">Just Peachy Parfait</div><div class="sline">Chicken Posole with Tortilla Chips</div></td>
     </tr>
     <tr class="past">
       <td class="day">Sat 9/19</td>
-      <td class="meal">BBQ Pizza</td>
-      <td class="meal empty">–</td>
+      <td class="meal dinner">BBQ Pizza</td>
+      <td class="meal lunch empty">–</td>
+      <td class="meal school empty">–</td>
     </tr>
     <tr class="past">
       <td class="day">Sun 9/20</td>
-      <td class="meal">G&amp;G’s</td>
-      <td class="meal empty">–</td>
+      <td class="meal dinner">G&amp;G’s</td>
+      <td class="meal lunch empty">–</td>
+      <td class="meal school empty">–</td>
     </tr>
     <tr class="past">
       <td class="day">Mon 9/21</td>
-      <td class="meal">Golden Curry</td>
-      <td class="meal empty">–</td>
+      <td class="meal dinner">Golden Curry</td>
+      <td class="meal lunch empty">–</td>
+      <td class="meal school"><div class="sline">Cheese Pizza</div><div class="sline">Turkey &amp; Cheese Wrap</div></td>
     </tr>
     <tr class="past">
       <td class="day">Tue 9/22</td>
-      <td class="meal">Spaghetti, Bread</td>
-      <td class="meal empty">–</td>
+      <td class="meal dinner">Spaghetti, Bread</td>
+      <td class="meal lunch empty">–</td>
+      <td class="meal school"><div class="sline">Whole Grain Soft Pretzel Cheese Sauce</div><div class="sline">Southwest Soft Taco</div><div class="sline">Crispy Chicken Salad</div></td>
     </tr>
     <tr class="today">
       <td class="day">Wed 9/23</td>
-      <td class="meal">Takeout</td>
-      <td class="meal empty">–</td>
+      <td class="meal dinner">Takeout</td>
+      <td class="meal lunch empty">–</td>
+      <td class="meal school"><div class="sline">Hot Dog</div><div class="sline">Macaroni &amp; Cheese</div><div class="sline">American Deli Sandwich</div></td>
     </tr>
     <tr>
       <td class="day">Thu 9/24</td>
-      <td class="meal">L/O Curry</td>
-      <td class="meal empty">–</td>
+      <td class="meal dinner">L/O Curry</td>
+      <td class="meal lunch empty">–</td>
+      <td class="meal school"><div class="sline">Cheese Pizza</div><div class="sline">Turkey &amp; Cheese Wrap</div></td>
     </tr>
   </table>
-  <div class="footer">Updated Wed Sep 23, 4:51 AM</div>
+  <div class="footer">Updated Wed Sep 23, 5:51 AM</div>
 </div>
 </body>
 </html>
