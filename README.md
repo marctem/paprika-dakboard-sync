@@ -59,8 +59,9 @@ limited styling of Dakboard's built-in External Data/JSON block.
    https://<your-username>.github.io/<repo-name>/
    ```
    It can take a minute or two to go live the first time. Open it in a
-   browser to confirm you see your styled meal list (dark background,
-   icon + day/meal-type + meal name per row).
+   browser to confirm you see your styled meal table (Dinner/Lunch columns,
+   one row per day, transparent background so it blends into whatever's
+   behind the block on your dashboard).
 
 6. **Add it to Dakboard as a Website/iframe block.**
    In your Dakboard dashboard, edit (or add) a Custom Screen, click **Add a
@@ -80,10 +81,28 @@ layout, all of it.
 
 Everything about the page's appearance lives in `HTML_TEMPLATE` and
 `ROW_TEMPLATE` inside `fetch_meal_plan.py` — plain HTML/CSS, no build step.
-Change the colors (currently a dark `#15171a` background), font sizes,
-spacing, or the row layout, then commit — the next Action run (or a manual
-"Run workflow") regenerates `index.html` with your changes, and GitHub
-Pages picks it up automatically.
+Change colors, font sizes, spacing, or the row layout, then commit — the
+next Action run (or a manual "Run workflow") regenerates `index.html` with
+your changes, and GitHub Pages picks it up automatically.
+
+Current design, for reference:
+- Two columns, Dinner (left) and Lunch (right); an empty slot shows a
+  muted "–" rather than blank space. Other meal types (breakfast/snack)
+  aren't shown on the page, though they're still in `meal-plan.json` if
+  you ever want them.
+- One row per day of the current cycle, always all 7 days regardless of
+  whether meals are planned.
+- Past days are dimmed (`tr.past`), today is bolded with a subtle
+  background highlight (`tr.today`), upcoming days are plain.
+- Background is transparent (`background-color: transparent` on
+  `html`/`body`) so Dakboard's own wallpaper shows through the block, with
+  a light `text-shadow` on the text to keep it legible against whatever's
+  behind it. If you still see a solid box instead of your dashboard's
+  background, check the block's own Formatting tab in Dakboard's Custom
+  Screen editor — its background needs to be set to none/transparent too,
+  since that's a separate layer from this page's CSS.
+- Sized for a ~500px-wide block (`.card { width: 500px; }`) — change that
+  if you resize the block on your dashboard.
 
 ## Notes
 

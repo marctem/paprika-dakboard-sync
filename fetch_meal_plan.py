@@ -45,12 +45,12 @@ WEEK_LENGTH_DAYS = 7
 
 MEAL_TYPE_NAMES = {0: "Breakfast", 1: "Lunch", 2: "Dinner", 3: "Snack"}
 MEAL_TYPE_ORDER = {0: 0, 1: 1, 2: 2, 3: 3}
-MEAL_TYPE_ICONS = {
-    0: "fa-solid fa-mug-hot",
-    1: "fa-solid fa-bowl-food",
-    2: "fa-solid fa-utensils",
-    3: "fa-solid fa-cookie-bite",
-}
+
+# The dashboard page only shows these two columns (Dinner left, Lunch
+# right) - breakfast/snack entries, if you ever add any, are included in
+# meal-plan.json but won't appear on the rendered page.
+DINNER_TYPE = 2
+LUNCH_TYPE = 1
 
 
 def _parse_json_response(resp: requests.Response) -> dict:
@@ -113,8 +113,9 @@ def current_cycle_bounds(today: datetime.date) -> tuple:
 
 def build_dakboard_json(meals: list, today: datetime.date = None) -> list:
     """Filter meals to the current Fri-Thu planning cycle and shape them
-    into the {value, title, subtitle, icon} format Dakboard's External
-    Data/JSON block expects."""
+    into a plain {value, title, subtitle} list -- kept around as a
+    general-purpose export (all meal types included), separate from the
+    dinner/lunch-only columns the rendered page shows."""
     if today is None:
         today = datetime.now().date()
     window_start, window_end = current_cycle_bounds(today)
@@ -142,7 +143,6 @@ def build_dakboard_json(meals: list, today: datetime.date = None) -> list:
                     meal_type=MEAL_TYPE_NAMES.get(meal_type, "Meal"),
                 ),
                 "subtitle": meal_date.isoformat(),
-                "icon": MEAL_TYPE_ICONS.get(meal_type, "fa-solid fa-utensils"),
             }
         )
 
@@ -152,106 +152,205 @@ def build_dakboard_json(meals: list, today: datetime.date = None) -> list:
     return entries
 
 
+def build_days(meals: list, today: datetime.date = None) -> list:
+    """Shape meals into one entry per day of the current Fri-Thu cycle,
+    each with a `dinner` and `lunch` slot (None if nothing's planned) --
+    this is what the two-column page is built from. Every day in the
+    cycle is included, even ones with no meals, so the table always shows
+    a full week."""
+    if today is None:
+        today = datetime.now().date()
+    window_start, window_end = current_cycle_bounds(today)
+
+    by_slot = {}
+    for meal in meals:
+        try:
+            meal_date = datetime.strptime(meal["date"], "%Y-%m-%d %H:%M:%S").date()
+        except (KeyError, ValueError, TypeError):
+            continue
+        if not (window_start <= meal_date <= window_end):
+            continue
+        meal_type = meal.get("type")
+        if meal_type not in (DINNER_TYPE, LUNCH_TYPE):
+            continue
+        key = (meal_date, meal_type)
+        by_slot.setdefault(key, []).append(
+            (meal.get("order_flag", 0), meal.get("name") or "(untitled meal)")
+        )
+
+    def slot_text(date_, meal_type):
+        names = [name for _, name in sorted(by_slot.get((date_, meal_type), []))]
+        return " / ".join(names) if names else None
+
+    days = []
+    for i in range(WEEK_LENGTH_DAYS):
+        d = window_start + timedelta(days=i)
+        days.append(
+            {
+                "date": d,
+                "label": d.strftime("%a %-m/%-d"),
+                "dinner": slot_text(d, DINNER_TYPE),
+                "lunch": slot_text(d, LUNCH_TYPE),
+                "is_today": d == today,
+                "is_past": d < today,
+            }
+        )
+    return days
+
+
 HTML_TEMPLATE = """<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Meal plan</title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <style>
   * {{ box-sizing: border-box; }}
   html, body {{
-    margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
-    background: #15171a;
+    margin: 0; padding: 0;
+    background-color: transparent;
     color: #f2f2f0;
     font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   }}
+  .meal, .day, .header {{
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+  }}
+  .card {{
+    width: 500px;
+    margin: 0 auto;
+    padding: 14px 16px 10px;
+  }}
   .header {{
-    font-size: clamp(10px, 1.4vw, 14px);
+    font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.06em;
     color: #8a8f98;
-    padding: 3vh 3vw 1vh;
+    margin-bottom: 8px;
   }}
-  .list {{ padding: 0 3vw 2vh; }}
-  .row {{
-    display: flex;
-    align-items: center;
-    gap: 3%;
-    padding: 1.4vh 0;
+  table {{
+    width: 100%;
+    border-collapse: collapse;
+  }}
+  th {{
+    text-align: left;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #6d7178;
+    font-weight: 500;
+    padding: 0 0 6px;
     border-bottom: 1px solid #2a2d31;
   }}
-  .row:last-child {{ border-bottom: none; }}
-  .row i {{
-    font-size: clamp(16px, 2.2vw, 26px);
-    color: #e8b95f;
-    width: 6%;
-    text-align: center;
-    flex: none;
+  th.day-col {{ width: 78px; }}
+  th.meal-col {{ width: 46%; }}
+  td {{
+    padding: 6px 0;
+    border-bottom: 1px solid #222427;
+    vertical-align: top;
+    font-size: 13px;
   }}
-  .text {{ min-width: 0; }}
-  .title {{
-    font-size: clamp(11px, 1.3vw, 15px);
+  tr:last-child td {{ border-bottom: none; }}
+  td.day {{
     color: #8a8f98;
-  }}
-  .value {{
-    font-size: clamp(14px, 2vw, 22px);
-    font-weight: 600;
+    font-size: 12px;
+    padding-right: 8px;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
   }}
-  .empty {{
-    padding: 4vh 3vw;
-    color: #8a8f98;
-    font-size: clamp(12px, 1.6vw, 16px);
+  td.meal {{
+    padding-right: 10px;
+    font-weight: 500;
+    line-height: 1.3;
+  }}
+  td.meal.empty {{
+    color: #4a4d52;
+    font-weight: 400;
+  }}
+  tr.past td.day,
+  tr.past td.meal {{
+    color: #4d4f53;
+  }}
+  tr.past td.meal.empty {{
+    color: #35373a;
+  }}
+  tr.today td {{
+    background: #1f232a;
+    font-weight: 700;
+  }}
+  tr.today td.day {{
+    color: #d8dade;
+    font-weight: 700;
+  }}
+  tr.today td.meal.empty {{
+    color: #6b6e73;
+    font-weight: 400;
   }}
   .footer {{
-    font-size: clamp(8px, 1vw, 11px);
+    font-size: 10px;
     color: #54585e;
     text-align: right;
-    padding: 0 3vw 2vh;
+    margin-top: 8px;
   }}
 </style>
 </head>
 <body>
+<div class="card">
   <div class="header">This week's meals</div>
-  <div class="list">
+  <table>
+    <tr>
+      <th class="day-col"></th>
+      <th class="meal-col">Dinner</th>
+      <th class="meal-col">Lunch</th>
+    </tr>
 {rows}
-  </div>
+  </table>
   <div class="footer">Updated {generated_at}</div>
+</div>
 </body>
 </html>
 """
 
-ROW_TEMPLATE = """    <div class="row">
-      <i class="{icon}" aria-hidden="true"></i>
-      <div class="text">
-        <div class="title">{title}</div>
-        <div class="value">{value}</div>
-      </div>
-    </div>"""
+ROW_TEMPLATE = """    <tr{row_class}>
+      <td class="day">{day}</td>
+      {dinner_cell}
+      {lunch_cell}
+    </tr>"""
 
 
-def build_html(entries: list, generated_at: datetime = None) -> str:
-    """Render the meal entries as a fully self-contained, pre-rendered HTML
+def _meal_cell(value):
+    if value:
+        return f'<td class="meal">{escape(value)}</td>'
+    return '<td class="meal empty">–</td>'
+
+
+def build_html(days: list, generated_at: datetime = None) -> str:
+    """Render the day list as a fully self-contained, pre-rendered HTML
     page -- no client-side fetch/JS needed, since Dakboard's Website/iframe
-    block just reloads this URL on whatever interval you set."""
+    block just reloads this URL on whatever interval you set. Transparent
+    background by design, so Dakboard's own wallpaper shows through (also
+    check the block's own Formatting tab in Dakboard is set to no
+    background, since that's a separate layer from this page's CSS)."""
     if generated_at is None:
         generated_at = datetime.now()
 
-    if entries:
-        rows_html = "\n".join(
-            ROW_TEMPLATE.format(
-                icon=escape(e["icon"]),
-                title=escape(e["title"]),
-                value=escape(e["value"]),
-            )
-            for e in entries
+    rows_html = "\n".join(
+        ROW_TEMPLATE.format(
+            row_class=(
+                ' class="{}"'.format(
+                    " ".join(
+                        c
+                        for c, on in (("past", day["is_past"]), ("today", day["is_today"]))
+                        if on
+                    )
+                )
+                if day["is_past"] or day["is_today"]
+                else ""
+            ),
+            day=escape(day["label"]),
+            dinner_cell=_meal_cell(day["dinner"]),
+            lunch_cell=_meal_cell(day["lunch"]),
         )
-    else:
-        rows_html = '    <div class="empty">No meals planned for this cycle yet.</div>'
+        for day in days
+    )
 
     return HTML_TEMPLATE.format(
         rows=rows_html,
@@ -269,17 +368,18 @@ def main() -> None:
     token = login(email, password)
     meals = get_meals(token)
     dakboard_data = build_dakboard_json(meals)
+    days = build_days(meals)
 
     with open(JSON_OUTPUT_FILE, "w", encoding="utf-8") as f:
         json.dump(dakboard_data, f, indent=2)
         f.write("\n")
 
     with open(HTML_OUTPUT_FILE, "w", encoding="utf-8") as f:
-        f.write(build_html(dakboard_data))
+        f.write(build_html(days))
 
     print(
-        f"Wrote {len(dakboard_data)} meal entries to "
-        f"{JSON_OUTPUT_FILE} and {HTML_OUTPUT_FILE}"
+        f"Wrote {len(dakboard_data)} meal entries to {JSON_OUTPUT_FILE} and "
+        f"{len(days)} days to {HTML_OUTPUT_FILE}"
     )
 
 
