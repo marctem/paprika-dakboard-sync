@@ -21,12 +21,20 @@ import os
 import sys
 from datetime import datetime
 from html import escape
+from zoneinfo import ZoneInfo
 
 import nutrislice
 import paprika
 
 JSON_OUTPUT_FILE = "meal-plan.json"
 HTML_OUTPUT_FILE = "index.html"
+
+# GitHub Actions runners run in UTC, not your local time -- without this,
+# "today" (and therefore which row is highlighted/dimmed) would flip over
+# at midnight UTC, which is still evening/afternoon in most US timezones.
+# Seattle is America/Los_Angeles (Pacific Time); change this if you ever
+# move or want the page anchored to a different timezone.
+LOCAL_TIMEZONE = ZoneInfo("America/Los_Angeles")
 
 # Where the generated files get written. Defaults to the current directory
 # (handy for a local test run), but the GitHub Actions workflow points this
@@ -101,7 +109,7 @@ def build_html(days: list, generated_at: datetime = None) -> str:
     own Formatting tab in Dakboard is set to no background, since that's a
     separate layer from this page's CSS)."""
     if generated_at is None:
-        generated_at = datetime.now()
+        generated_at = datetime.now(LOCAL_TIMEZONE)
 
     rows_html = "\n".join(
         ROW_TEMPLATE.format(
@@ -137,7 +145,7 @@ def main() -> None:
         print("PAPRIKA_EMAIL and PAPRIKA_PASSWORD must both be set", file=sys.stderr)
         sys.exit(1)
 
-    today = datetime.now().date()
+    today = datetime.now(LOCAL_TIMEZONE).date()
     window_start, window_end = paprika.current_cycle_bounds(today)
 
     # Paprika: if login or the fetch itself fails, don't take the whole page
