@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meal plan</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
+    background: #15171a;
+    color: #f2f2f0;
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  .header {
+    font-size: clamp(10px, 1.4vw, 14px);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #8a8f98;
+    padding: 3vh 3vw 1vh;
+  }
+  .list { padding: 0 3vw 2vh; }
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 3%;
+    padding: 1.4vh 0;
+    border-bottom: 1px solid #2a2d31;
+  }
+  .row:last-child { border-bottom: none; }
+  .row i {
+    font-size: clamp(16px, 2.2vw, 26px);
+    color: #e8b95f;
+    width: 6%;
+    text-align: center;
+    flex: none;
+  }
+  .text { min-width: 0; }
+  .title {
+    font-size: clamp(11px, 1.3vw, 15px);
+    color: #8a8f98;
+  }
+  .value {
+    font-size: clamp(14px, 2vw, 22px);
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .empty {
+    padding: 4vh 3vw;
+    color: #8a8f98;
+    font-size: clamp(12px, 1.6vw, 16px);
+  }
+  .footer {
+    font-size: clamp(8px, 1vw, 11px);
+    color: #54585e;
+    text-align: right;
+    padding: 0 3vw 2vh;
+  }
+</style>
+</head>
+<body>
+  <div class="header">This week's meals</div>
+  <div class="list">
+    <div class="row">
+      <i class="fa-solid fa-bowl-food" aria-hidden="true"></i>
+      <div class="text">
+        <div class="title">Fri Sep 18 · Lunch</div>
+        <div class="value">(E,G)</div>
+      </div>
+    </div>
+    <div class="row">
+      <i class="fa-solid fa-utensils" aria-hidden="true"></i>
+      <div class="text">
+        <div class="title">Fri Sep 18 · Dinner</div>
+        <div class="value">Sandwiches</div>
+      </div>
+    </div>
+    <div class="row">
+      <i class="fa-solid fa-utensils" aria-hidden="true"></i>
+      <div class="text">
+        <div class="title">Sat Sep 19 · Dinner</div>
+        <div class="value">BBQ Pizza</div>
+      </div>
+    </div>
+    <div class="row">
+      <i class="fa-solid fa-utensils" aria-hidden="true"></i>
+      <div class="text">
+        <div class="title">Sun Sep 20 · Dinner</div>
+        <div class="value">G&amp;G’s</div>
+      </div>
+    </div>
+    <div class="row">
+      <i class="fa-solid fa-utensils" aria-hidden="true"></i>
+      <div class="text">
+        <div class="title">Mon Sep 21 · Dinner</div>
+        <div class="value">Golden Curry</div>
+      </div>
+    </div>
+    <div class="row">
+      <i class="fa-solid fa-utensils" aria-hidden="true"></i>
+      <div class="text">
+        <div class="title">Tue Sep 22 · Dinner</div>
+        <div class="value">Spaghetti, Bread</div>
+      </div>
+    </div>
+    <div class="row">
+      <i class="fa-solid fa-utensils" aria-hidden="true"></i>
+      <div class="text">
+        <div class="title">Wed Sep 23 · Dinner</div>
+        <div class="value">Takeout</div>
+      </div>
+    </div>
+    <div class="row">
+      <i class="fa-solid fa-utensils" aria-hidden="true"></i>
+      <div class="text">
+        <div class="title">Thu Sep 24 · Dinner</div>
+        <div class="value">L/O Curry</div>
+      </div>
+    </div>
+  </div>
+  <div class="footer">Updated Wed Sep 23, 4:25 AM</div>
+</body>
+</html>
