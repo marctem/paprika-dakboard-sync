@@ -1,0 +1,93 @@
+# ==========================================
+# Byte-compiled / optimized / DLL files
+# ==========================================
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# ==========================================
+# Virtual Environments
+# ==========================================
+# It is best practice to keep dependencies out of git.
+.venv/
+venv/
+ENV/
+env/
+# For pipenv, Poetry, or conda environments if local
+.shuttle/
+.pdm-plugins/
+.pdm-build/
+
+# ==========================================
+# Distribution / Packaging
+# ==========================================
+# Built packages and distribution directories
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# ==========================================
+# Secrets and Environment Variables
+# ==========================================
+# Never commit credentials or local variables to git.
+.env
+.env.*
+!.env.example
+secrets.toml
+
+# ==========================================
+# Unit Testing / Coverage Reports
+# ==========================================
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# ==========================================
+# Documentation
+# ==========================================
+docs/_build/
+site/
+
+# ==========================================
+# Jupyter Notebooks
+# ==========================================
+.ipynb_checkpoints
+
+# ==========================================
+# IDEs and Text Editors (Optional but helpful)
+# ==========================================
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ==========================================
+# Operating System Files
+# ==========================================
+.DS_Store
+Thumbs.db
