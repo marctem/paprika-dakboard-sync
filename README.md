@@ -7,7 +7,9 @@ builds the page, and deploys it to GitHub Pages.
 
 ## What's in this folder
 
-- `fetch_meal_plan.py` — logs into Paprika, pulls the meal plan, fetches the school lunch menu, writes `index.html` and `meal-plan.json`
+- `fetch_meal_plan.py` — ties `paprika.py` and `nutrislice.py` together: fetches both, renders the page, writes `index.html` and `meal-plan.json`
+- `paprika.py` — Paprika Cloud Sync client: login, fetch meals, shape them into the current Fri-Thu cycle
+- `nutrislice.py` — Nutrislice client: fetch the school lunch menu, extract just the main-course entrees
 - `style.css` — the page's styling
 - `requirements.txt` — the one Python dependency (`requests`)
 - `.github/workflows/sync-meal-plan.yml` — builds the page each run and deploys it to GitHub Pages
@@ -20,6 +22,8 @@ builds the page, and deploys it to GitHub Pages.
 2. **Upload these files, preserving the folder structure:**
    ```
    fetch_meal_plan.py
+   paprika.py
+   nutrislice.py
    style.css
    requirements.txt
    .github/workflows/sync-meal-plan.yml
@@ -36,8 +40,8 @@ builds the page, and deploys it to GitHub Pages.
    The school lunch menu needs no credentials (Nutrislice's API is
    public), but it is pointed at a specific district/school via
    `NUTRISLICE_DISTRICT`, `NUTRISLICE_SCHOOL`, and `NUTRISLICE_MENU_TYPE`
-   near the top of `fetch_meal_plan.py` — edit those directly if you ever
-   need a different school.
+   near the top of `nutrislice.py` — edit those directly if you ever need
+   a different school.
 
 4. **Turn on GitHub Pages.**
    Settings -> Pages -> under "Build and deployment", set Source to
@@ -93,8 +97,8 @@ Current design:
 - **Friday-Thursday cycle window:** anchored to the calendar, not a
   rolling window from "today" — it always shows the full Fri-Thu cycle,
   and switches over automatically as soon as the calendar rolls to
-  Friday. Change `WEEK_ANCHOR_WEEKDAY` in `fetch_meal_plan.py` (Monday=0
-  ... Sunday=6) if your planning day changes.
+  Friday. Change `WEEK_ANCHOR_WEEKDAY` in `paprika.py` (Monday=0 ...
+  Sunday=6) if your planning day changes.
 - **Run frequency:** hourly (`cron: "0 * * * *"` in the workflow). Change
   the cron expression if you want it faster or slower.
 - **Both APIs are unofficial/reverse-engineered** (Paprika's Cloud Sync
