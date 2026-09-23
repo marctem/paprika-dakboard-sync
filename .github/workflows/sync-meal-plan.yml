@@ -29,8 +29,8 @@ jobs:
           PAPRIKA_PASSWORD: ${{ secrets.PAPRIKA_PASSWORD }}
         run: python fetch_meal_plan.py
 
-      - name: Commit updated meal-plan.json (only if it changed)
+      - name: Commit updated meal plan files (only if they changed)
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "Update meal plan"
-          file_pattern: meal-plan.json
+          file_pattern: meal-plan.json index.html
