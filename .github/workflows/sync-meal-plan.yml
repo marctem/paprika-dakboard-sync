@@ -1,0 +1,36 @@
+name: Sync Paprika Meal Plan
+
+on:
+  schedule:
+    # Runs at the top of every hour. Edit the cron expression to change
+    # frequency (e.g. "0 */3 * * *" for every 3 hours).
+    - cron: "0 * * * *"
+  workflow_dispatch: {}   # lets you trigger it manually from the Actions tab
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Fetch meal plan from Paprika
+        env:
+          PAPRIKA_EMAIL: ${{ secrets.PAPRIKA_EMAIL }}
+          PAPRIKA_PASSWORD: ${{ secrets.PAPRIKA_PASSWORD }}
+        run: python fetch_meal_plan.py
+
+      - name: Commit updated meal-plan.json (only if it changed)
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "Update meal plan"
+          file_pattern: meal-plan.json
