@@ -62,17 +62,23 @@ def _extract_entrees(day_payload: dict) -> list:
     return names
 
 
-def get_school_lunch_days(window_start, window_end) -> dict:
+def get_school_lunch_days(window_start, window_end) -> tuple:
     """Fetch school lunch entrees for every day in [window_start,
     window_end]. Nutrislice's API returns a full Sunday-Saturday week per
     call, and the Fri-Thu planning cycle almost always spans two such
     weeks, so this fetches each distinct week once and merges the results.
-    Returns {date: [entree names]}; days with no published menu (weekends,
-    holidays, no data yet) simply won't have a key, which the caller
-    treats the same as an empty list. Network or schema problems are
-    swallowed (with a warning to stderr) so a Nutrislice hiccup never
-    takes down the Paprika half of the page."""
+
+    Returns (entrees_by_date, errors_by_date):
+    - entrees_by_date: {date: [entree names]}; days with no published menu
+      (weekends, holidays, no data yet) simply won't have a key, which the
+      caller treats the same as an empty list.
+    - errors_by_date: {date: error message} for every day whose week
+      failed to fetch -- the caller can show this on the page instead of
+      silently rendering an empty cell. A warning is also printed to
+      stderr either way. This never raises -- a Nutrislice hiccup should
+      never take down the Paprika half of the page."""
     entrees_by_date = {}
+    errors_by_date = {}
 
     week_starts_needed = set()
     d = window_start
@@ -99,5 +105,11 @@ def get_school_lunch_days(window_start, window_end) -> dict:
                 f"{week_start}: {exc}",
                 file=sys.stderr,
             )
+            error_message = str(exc) or type(exc).__name__
+            week_day = week_start
+            for _ in range(7):
+                if window_start <= week_day <= window_end:
+                    errors_by_date[week_day] = error_message
+                week_day += timedelta(days=1)
 
-    return entrees_by_date
+    return entrees_by_date, errors_by_date

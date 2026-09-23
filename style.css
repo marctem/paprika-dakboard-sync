@@ -77,6 +77,11 @@ td.meal.empty {
   color: #4a4d52;
   font-weight: 400;
 }
+td.meal.error {
+  color: #e0a35c;
+  font-weight: 400;
+  font-style: italic;
+}
 tr.past td.day,
 tr.past td.meal {
   color: #4d4f53;

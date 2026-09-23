@@ -74,14 +74,18 @@ ROW_TEMPLATE = """    <tr{row_class}>
     </tr>"""
 
 
-def _meal_cell(value, extra_class):
+def _meal_cell(value, extra_class, error=None):
     cls = f"meal {extra_class}"
+    if error:
+        return f'<td class="{cls} error">⚠ {escape(error)}</td>'
     if value:
         return f'<td class="{cls}">{escape(value)}</td>'
     return f'<td class="{cls} empty">–</td>'
 
 
-def _school_cell(names):
+def _school_cell(names, error=None):
+    if error:
+        return f'<td class="meal school error"><div class="sline">⚠ {escape(error)}</div></td>'
     if names:
         lines = "".join(f'<div class="sline">{escape(n)}</div>' for n in names)
         return f'<td class="meal school">{lines}</td>'
@@ -113,9 +117,9 @@ def build_html(days: list, generated_at: datetime = None) -> str:
                 else ""
             ),
             day=escape(day["label"]),
-            dinner_cell=_meal_cell(day["dinner"], "dinner"),
+            dinner_cell=_meal_cell(day["dinner"], "dinner", error=day.get("dinner_error")),
             lunch_cell=_meal_cell(day["lunch"], "lunch"),
-            school_cell=_school_cell(day["school_lunch"]),
+            school_cell=_school_cell(day["school_lunch"], error=day.get("school_lunch_error")),
         )
         for day in days
     )
@@ -133,18 +137,34 @@ def main() -> None:
         print("PAPRIKA_EMAIL and PAPRIKA_PASSWORD must both be set", file=sys.stderr)
         sys.exit(1)
 
-    token = paprika.login(email, password)
-    meals = paprika.get_meals(token)
-
     today = datetime.now().date()
     window_start, window_end = paprika.current_cycle_bounds(today)
 
-    dakboard_data = paprika.build_dakboard_json(meals, today=today)
-    days = paprika.build_days(meals, today=today)
+    # Paprika: if login or the fetch itself fails, don't take the whole page
+    # down with it -- still render the full 7-day structure, with the error
+    # surfaced in the Dinner column instead of silently showing dashes.
+    try:
+        token = paprika.login(email, password)
+        meals = paprika.get_meals(token)
+        paprika_error = None
+    except Exception as exc:
+        print(f"Warning: couldn't fetch Paprika meal plan: {exc}", file=sys.stderr)
+        meals = []
+        paprika_error = str(exc) or type(exc).__name__
 
-    school_lunch = nutrislice.get_school_lunch_days(window_start, window_end)
+    dakboard_data = paprika.build_dakboard_json(meals, today=today) if not paprika_error else []
+    days = paprika.build_days(meals, today=today)
     for day in days:
-        day["school_lunch"] = school_lunch.get(day["date"], [])
+        day["dinner_error"] = paprika_error
+
+    # Nutrislice: a fetch failure for a given week is surfaced in the
+    # School Lunch column for just the days in that week, rather than
+    # failing the run or silently showing dashes.
+    school_lunch, school_lunch_errors = nutrislice.get_school_lunch_days(window_start, window_end)
+    for day in days:
+        d = day["date"]
+        day["school_lunch"] = school_lunch.get(d, [])
+        day["school_lunch_error"] = school_lunch_errors.get(d)
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     json_path = os.path.join(OUTPUT_DIR, JSON_OUTPUT_FILE)
