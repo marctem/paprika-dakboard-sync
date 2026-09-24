@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Ties together paprika.py and nutrislice.py: fetches the current Fri-Thu
+Ties together paprika.py and nutrislice.py: fetches the current Fri-Fri
 cycle's meal plan from Paprika and the matching school lunch menu from
 Nutrislice, then renders and writes (1) a plain JSON array (Paprika data
 only) and (2) a fully self-contained, pre-rendered HTML page, meant to be
@@ -127,7 +127,14 @@ def build_html(days: list, generated_at: datetime = None) -> str:
             day=escape(day["label"]),
             dinner_cell=_meal_cell(day["dinner"], "dinner", error=day.get("dinner_error")),
             lunch_cell=_meal_cell(day["lunch"], "lunch"),
-            school_cell=_school_cell(day["school_lunch"], error=day.get("school_lunch_error")),
+            # Past days drop the school lunch detail entirely (rather than
+            # showing it, now-irrelevant) so those rows compact down to a
+            # single line instead of staying tall from old entree lists.
+            school_cell=(
+                '<td class="meal school empty">–</td>'
+                if day["is_past"]
+                else _school_cell(day["school_lunch"], error=day.get("school_lunch_error"))
+            ),
         )
         for day in days
     )

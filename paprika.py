@@ -4,7 +4,7 @@ Paprika Cloud Sync client and meal-plan shaping.
 Logs into Paprika's unofficial Cloud Sync API (reverse-engineered by the
 community, see https://github.com/aarons22/paprika-tools -- there's no
 official one, so this could break if Paprika changes their backend),
-fetches planned meals, and shapes them into the current Friday-Thursday
+fetches planned meals, and shapes them into the current Friday-to-Friday
 planning cycle.
 """
 
@@ -18,14 +18,18 @@ import requests
 PAPRIKA_BASE = "https://www.paprikaapp.com/api"
 
 # Your planning cadence: you build the plan Thursday night, covering Friday
-# through the following Thursday. Rather than a rolling "today + 6 days"
+# through the following Thursday. Rather than a rolling "today + N days"
 # window (which would cut a cycle in half depending on what day the script
 # happens to run), we anchor to the most recent cycle-start weekday on or
-# before today, so the full Fri-Thu cycle always displays together -
-# whether the script runs Friday morning or the following Wednesday night.
+# before today, so the full cycle always displays together - whether the
+# script runs Friday morning or the following Wednesday night.
 # Monday=0 ... Sunday=6, so Friday=4.
 WEEK_ANCHOR_WEEKDAY = 4
-WEEK_LENGTH_DAYS = 7
+
+# 8 days, not 7: the cycle runs Friday through the *following* Friday
+# inclusive (Fri-Sat-Sun-Mon-Tue-Wed-Thu-Fri), so the last row is always a
+# one-day peek at the start of next week's cycle.
+CYCLE_LENGTH_DAYS = 8
 
 MEAL_TYPE_NAMES = {0: "Breakfast", 1: "Lunch", 2: "Dinner", 3: "Snack"}
 MEAL_TYPE_ORDER = {0: 0, 1: 1, 2: 2, 3: 3}
@@ -79,11 +83,11 @@ def get_meals(token: str) -> list:
 
 
 def current_cycle_bounds(today: datetime.date) -> tuple:
-    """Return (start, end) for the Fri-Thu cycle that contains `today`.
+    """Return (start, end) for the Fri-Fri cycle that contains `today`.
 
     This is anchored to the calendar, not to when meals were entered, so it
     stays correct no matter when during the week you add or edit meals:
-    - Run it on a Friday -> that Friday through the next Thursday.
+    - Run it on a Friday -> that Friday through the *following* Friday.
     - Run it on the Thursday night you're re-planning -> the *outgoing*
       cycle (prior Friday through today) still displays in full until the
       calendar actually rolls over to Friday, at which point the newly
@@ -91,12 +95,12 @@ def current_cycle_bounds(today: datetime.date) -> tuple:
     """
     days_since_anchor = (today.weekday() - WEEK_ANCHOR_WEEKDAY) % 7
     start = today - timedelta(days=days_since_anchor)
-    end = start + timedelta(days=WEEK_LENGTH_DAYS - 1)
+    end = start + timedelta(days=CYCLE_LENGTH_DAYS - 1)
     return start, end
 
 
 def build_dakboard_json(meals: list, today: datetime.date = None) -> list:
-    """Filter meals to the current Fri-Thu planning cycle and shape them
+    """Filter meals to the current Fri-Fri planning cycle and shape them
     into a plain {value, title, subtitle} list -- kept around as a
     general-purpose export (all meal types included), separate from the
     dinner/lunch columns the rendered page shows."""
@@ -137,10 +141,10 @@ def build_dakboard_json(meals: list, today: datetime.date = None) -> list:
 
 
 def build_days(meals: list, today: datetime.date = None) -> list:
-    """Shape meals into one entry per day of the current Fri-Thu cycle,
+    """Shape meals into one entry per day of the current Fri-Fri cycle,
     each with `dinner` and `lunch` slots (None if nothing's planned).
     Every day in the cycle is included, even ones with no meals, so the
-    table always shows a full week.
+    table always shows the full 8-day span.
 
     This does not know about school lunch -- the caller (fetch_meal_plan.py)
     merges that in separately from nutrislice.get_school_lunch_days()."""
@@ -169,7 +173,7 @@ def build_days(meals: list, today: datetime.date = None) -> list:
         return " / ".join(names) if names else None
 
     days = []
-    for i in range(WEEK_LENGTH_DAYS):
+    for i in range(CYCLE_LENGTH_DAYS):
         d = window_start + timedelta(days=i)
         days.append(
             {

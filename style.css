@@ -101,6 +101,9 @@ tr.today td.meal.empty {
   color: #6b6e73;
   font-weight: 400;
 }
+tr.today td.dinner {
+  font-size: 20px;
+}
 .footer {
   font-size: 10px;
   color: #54585e;
